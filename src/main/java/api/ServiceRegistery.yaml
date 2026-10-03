@@ -1,0 +1,271 @@
+openapi: 3.0.3
+
+info:
+  title: RouteSphere Service Registry API
+  description: Service registration and discovery API for RouteSphere
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8080
+
+tags:
+  - name: Service Registration
+    description: Register and manage service instances
+  - name: Service Discovery
+    description: Discover registered services and instances
+
+paths:
+
+  /api/v1/instances:
+
+    post:
+      tags:
+        - Service Registration
+      summary: Register a service instance
+      operationId: registerInstance
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServiceInstanceRegistration'
+
+      responses:
+        '201':
+          description: Service instance registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceInstance'
+
+        '400':
+          description: Invalid registration request
+
+        '409':
+          description: Instance already registered
+
+
+  /api/v1/instances/{instanceId}:
+
+    get:
+      tags:
+        - Service Registration
+      summary: Get service instance
+      operationId: getInstance
+
+      parameters:
+        - $ref: '#/components/parameters/InstanceId'
+
+      responses:
+        '200':
+          description: Service instance found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceInstance'
+
+        '404':
+          description: Instance not found
+
+
+    delete:
+      tags:
+        - Service Registration
+      summary: Deregister service instance
+      operationId: deregisterInstance
+
+      parameters:
+        - $ref: '#/components/parameters/InstanceId'
+
+      responses:
+        '204':
+          description: Service instance deregistered successfully
+
+        '404':
+          description: Instance not found
+
+
+  /api/v1/instances/{instanceId}/heartbeat:
+
+    post:
+      tags:
+        - Service Registration
+      summary: Send instance heartbeat
+      operationId: heartbeat
+
+      parameters:
+        - $ref: '#/components/parameters/InstanceId'
+
+      responses:
+        '204':
+          description: Heartbeat accepted
+
+        '404':
+          description: Instance not found
+
+
+  /api/v1/services:
+
+    get:
+      tags:
+        - Service Discovery
+      summary: List registered services
+      operationId: listServices
+
+      responses:
+        '200':
+          description: Registered services
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ServiceSummary'
+
+
+  /api/v1/services/{serviceName}:
+
+    get:
+      tags:
+        - Service Discovery
+      summary: Get service instances
+      operationId: getService
+
+      parameters:
+        - name: serviceName
+          in: path
+          required: true
+          schema:
+            type: string
+          example: payment-service
+
+      responses:
+        '200':
+          description: Service and its instances
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceDetails'
+
+        '404':
+          description: Service not found
+
+
+components:
+
+  parameters:
+
+    InstanceId:
+      name: instanceId
+      in: path
+      required: true
+      description: Unique identifier of the service instance
+      schema:
+        type: string
+      example: payment-service-01
+
+
+  schemas:
+
+    ServiceInstanceRegistration:
+      type: object
+      required:
+        - serviceName
+        - instanceId
+        - host
+        - port
+        - protocol
+        - healthCheckPath
+
+      properties:
+
+        serviceName:
+          type: string
+          description: Logical name of the service
+          example: payment-service
+
+        instanceId:
+          type: string
+          description: Unique identifier of this running instance
+          example: payment-service-01
+
+        host:
+          type: string
+          description: Hostname or IP address of the service instance
+          example: 10.0.1.15
+
+        port:
+          type: integer
+          format: int32
+          example: 8080
+
+        protocol:
+          type: string
+          enum:
+            - HTTP
+            - HTTPS
+          example: HTTP
+
+        healthCheckPath:
+          type: string
+          description: Endpoint used by RouteSphere to check instance health
+          example: /actuator/health
+
+
+    ServiceInstance:
+      allOf:
+        - $ref: '#/components/schemas/ServiceInstanceRegistration'
+        - type: object
+          properties:
+
+            status:
+              type: string
+              enum:
+                - STARTING
+                - REGISTERED
+                - UP
+                - UNHEALTHY
+                - DEREGISTERED
+              example: UP
+
+            registeredAt:
+              type: string
+              format: date-time
+              example: 2026-10-04T00:30:00Z
+
+            lastHeartbeat:
+              type: string
+              format: date-time
+              example: 2026-10-04T00:30:10Z
+
+
+    ServiceSummary:
+      type: object
+      properties:
+
+        serviceName:
+          type: string
+          example: payment-service
+
+        instanceCount:
+          type: integer
+          example: 3
+
+        healthyInstanceCount:
+          type: integer
+          example: 2
+
+
+    ServiceDetails:
+      type: object
+      properties:
+
+        serviceName:
+          type: string
+          example: payment-service
+
+        instances:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServiceInstance'
